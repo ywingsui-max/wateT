@@ -52,8 +52,8 @@
         .empty-state p { font-size: 14px; max-width: 400px; }
         
         .message { max-width: 80%; padding: 12px 16px; border-radius: var(--radius); line-height: 1.8; font-size: 14px; position: relative; animation: fadeIn 0.3s ease; white-space: pre-wrap; word-wrap: break-word; }
-        .message.user { align-self: flex-end; background: #1a1a1a; color: #ffffff; border-bottom-right-radius: 4px; display: flex; gap: 10px; align-items: flex-start; }
-        .message.ai { align-self: flex-start; background: #ffffff; border: 1px solid var(--border); color: #0f172a; border-bottom-left-radius: 4px; display: flex; gap: 10px; align-items: flex-start; margin-top: 8px; }
+        .message.user { align-self: flex-end; background: #1a1a1a; color: #ffffff; border-bottom-right-radius: 4px; display: flex; gap: 10px; align-items: flex-start; margin-bottom: 20px; }
+        .message.ai { align-self: flex-start; background: #ffffff; border: 1px solid var(--border); color: #0f172a; border-bottom-left-radius: 4px; display: flex; gap: 10px; align-items: flex-start; margin-top: 20px; }
         .message.error { background: #fef2f2; color: var(--error); border-color: #fecaca; }
         .message-avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; overflow: hidden; }
         .message.user .message-avatar { background: #333; }
@@ -61,14 +61,18 @@
         .message-avatar img { width: 100%; height: 100%; object-fit: cover; }
         .message-content-wrapper { flex: 1; min-width: 0; }
         .msg-content { line-height: 1.8; }
-        .msg-content p { margin-bottom: 8px; }
+        .msg-content p { margin-bottom: 10px; }
         .msg-content p:last-child { margin-bottom: 0; }
         .msg-content code { background: rgba(0,0,0,0.1); padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', 'Monaco', monospace; font-size: 13px; }
         .message.user .msg-content code { background: rgba(255,255,255,0.2); }
-        .msg-content pre { background: #f1f5f9; padding: 12px; border-radius: 8px; overflow-x: auto; margin: 8px 0; }
+        .msg-content pre { background: #f1f5f9; padding: 12px; border-radius: 8px; overflow-x: auto; margin: 10px 0; }
         .message.user .msg-content pre { background: rgba(255,255,255,0.1); }
-        .msg-content ul, .msg-content ol { margin: 8px 0; padding-left: 20px; }
-        .msg-content blockquote { border-left: 3px solid var(--border); padding-left: 12px; margin: 8px 0; color: var(--text-secondary); }
+        .msg-content pre code { background: transparent; padding: 0; }
+        .msg-content ul, .msg-content ol { margin: 10px 0; padding-left: 20px; }
+        .msg-content li { margin-bottom: 4px; }
+        .msg-content blockquote { border-left: 3px solid var(--border); padding-left: 12px; margin: 10px 0; color: var(--text-secondary); }
+        .msg-content strong { font-weight: 600; }
+        .msg-content em { font-style: italic; }
         .typing-cursor::after { content: '▋'; animation: blink 1s infinite; }
 
         .input-area { padding: 24px 24px 28px; background: var(--bg-sidebar); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 16px; }
@@ -425,7 +429,7 @@
         });
         
         input.addEventListener('compositionend', function() {
-            isComposing = false;
+            setTimeout(() => { isComposing = false; }, 100);
         });
         
         input.addEventListener('input', function() {
@@ -563,7 +567,9 @@
             }
         }
         
-        div.innerHTML = `${avatarHtml}<div class="message-content-wrapper"><div class="msg-content">${content}</div></div>`;
+        // For AI messages, format with markdown; for user messages, use plain text
+        const formattedContent = role === 'ai' && !isLoading ? formatMessage(content) : content;
+        div.innerHTML = `${avatarHtml}<div class="message-content-wrapper"><div class="msg-content">${formattedContent}</div></div>`;
         container.appendChild(div);
         scrollToBottom();
         return div;
@@ -584,10 +590,10 @@
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
         
-        // Code blocks (```code```)
+        // Code blocks (```code```) - must be done before other replacements
         formatted = formatted.replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>');
         
-        // Inline code (`code`)
+        // Inline code (`code`) - must be done before bold/italic to avoid conflicts
         formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
         
         // Bold (**text**)
@@ -596,23 +602,29 @@
         // Italic (*text*)
         formatted = formatted.replace(/\*([^*]+)\*/g, '<em>$1</em>');
         
-        // Line breaks - convert double newline to paragraph break
-        const paragraphs = formatted.split(/\n\n+/);
-        formatted = paragraphs.map(p => {
-            // Convert single newlines within paragraph to <br>
-            return '<p>' + p.replace(/\n/g, '<br>') + '</p>';
-        }).join('');
-        
-        // Unordered lists (- item or * item)
-        formatted = formatted.replace(/(?:^|\n)([-*])\s+(.+?)(?=\n[-*]|\n\n|$)/g, '<ul><li>$2</li></ul>');
-        formatted = formatted.replace(/<\/ul>\s*<ul>/g, ''); // Merge adjacent lists
+        // Unordered lists (- item or * item) - process line by line
+        formatted = formatted.replace(/^(?:[-*])\s+(.+)$/gm, '<li>$1</li>');
+        formatted = formatted.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
         
         // Ordered lists (1. item)
-        formatted = formatted.replace(/(?:^|\n)\d+\.\s+(.+?)(?=\n\d+\.|\n\n|$)/g, '<ol><li>$1</li></ol>');
-        formatted = formatted.replace(/<\/ol>\s*<ol>/g, ''); // Merge adjacent lists
+        formatted = formatted.replace(/^\d+\.\s+(.+)$/gm, '<oli>$1</oli>');
+        formatted = formatted.replace(/(<oli>.*<\/oli>\n?)+/g, (match) => {
+            return '<ol>' + match.replace(/<\/?oli>/g, (tag) => tag.includes('/') ? '</li>' : '<li>') + '</ol>';
+        });
         
         // Blockquotes (> text)
         formatted = formatted.replace(/^&gt;\s+(.+)$/gm, '<blockquote>$1</blockquote>');
+        
+        // Line breaks - convert double newline to paragraph break
+        // But preserve content inside pre/code blocks
+        if (!formatted.includes('<pre>')) {
+            const paragraphs = formatted.split(/\n\n+/);
+            formatted = paragraphs.map(p => {
+                if (p.trim().startsWith('<')) return p; // Skip if already wrapped in HTML
+                // Convert single newlines within paragraph to <br>
+                return '<p>' + p.replace(/\n/g, '<br>') + '</p>';
+            }).join('');
+        }
         
         return formatted;
     }
