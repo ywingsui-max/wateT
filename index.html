@@ -199,7 +199,7 @@
         <h3>添加模型</h3>
         <div class="form-group">
             <label>模型名称</label>
-            <input type="text" id="newModelName" placeholder="例如: qwen-plus, qwen-turbo" oninput="detectProvider()">
+            <input type="text" id="newModelName" placeholder="例如: qwen3.6-plus, qwen-turbo" oninput="detectProvider()">
         </div>
         <div class="form-row">
             <div class="form-group">
@@ -641,7 +641,7 @@
         
         // Auto-detect and set default model name and URL for Qwen
         if (!name || name.toLowerCase() === 'qwen') {
-            name = 'qwen-plus'; // Default to a valid Qwen model
+            name = 'qwen3.6-plus'; // Default to a valid Qwen model
         }
         
         if (!baseUrl) {
