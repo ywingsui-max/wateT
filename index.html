@@ -485,7 +485,14 @@
                 body: JSON.stringify({
                     model: model.name,
                     messages: state.chatHistory,
-                    stream: true
+                    stream: true,
+                    top_p: 0.8,
+                    temperature: 0.7,
+                    result_format: "message",
+                    extra_body: {
+                        enable_thinking: true,
+                        thinking_budget: 4000
+                    }
                 }),
                 signal: state.abortController.signal
             });
