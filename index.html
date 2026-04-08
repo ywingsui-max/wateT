@@ -504,12 +504,21 @@
         btn.disabled = true;
         btn.textContent = '⏳ 测试中...';
 
-        const name = document.getElementById('newModelName').value.trim() || 'test';
+        let name = document.getElementById('newModelName').value.trim();
         const fullKey = document.getElementById('fullApiKey').value.trim() || state.settings.openaiKey;
         let baseUrl = document.getElementById('baseUrl').value.trim();
         
+        // Auto-detect and set default model name and URL for Qwen
+        if (!name || name.toLowerCase() === 'qwen') {
+            name = 'qwen-plus'; // Default to a valid Qwen model
+        }
+        
         if (!baseUrl) {
-            baseUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+            if (name.toLowerCase().includes('qwen') || name.toLowerCase().includes('dashscope')) {
+                baseUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+            } else {
+                baseUrl = 'https://api.openai.com/v1';
+            }
         }
 
         try {
