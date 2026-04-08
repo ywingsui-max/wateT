@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Hub - 多模态智能助手</title>
+    <style>
+        :root {
+            --bg-main: #f8fafc;
+            --bg-sidebar: #ffffff;
+            --bg-chat: #ffffff;
+            --bg-input: #ffffff;
+            --border: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --radius: 12px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: var(--bg-main); color: var(--text-primary); height: 100vh; display: flex; overflow: hidden; }
+        button, input, textarea, select { font-family: inherit; font-size: inherit; }
+        
+        /* Sidebar */
+        .sidebar { width: 260px; background: var(--bg-sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 16px; gap: 12px; transition: transform 0.3s ease; }
+        .logo { font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .logo span { color: var(--accent); }
+        .nav-btn { padding: 10px 12px; border: none; background: transparent; text-align: left; cursor: pointer; border-radius: 8px; color: var(--text-secondary); font-weight: 500; transition: all 0.2s; }
+        .nav-btn:hover { background: #f1f5f9; color: var(--text-primary); }
+        .nav-btn.active { background: #eff6ff; color: var(--accent); }
+        .nav-btn.primary { background: var(--accent); color: white; margin-top: 8px; }
+        .nav-btn.primary:hover { background: var(--accent-hover); }
+        
+        .model-list { flex: 1; overflow-y: auto; margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+        .model-item { padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; }
+        .model-item:hover { background: #f1f5f9; }
+        .model-item.selected { background: #eff6ff; color: var(--accent); font-weight: 500; }
+        .model-tag { font-size: 10px; padding: 2px 6px; background: #e2e8f0; border-radius: 4px; color: var(--text-secondary); }
+
+        /* Main Area */
+        .main { flex: 1; display: flex; flex-direction: column; background: var(--bg-main); position: relative; }
+        .header { padding: 16px 24px; background: var(--bg-sidebar); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+        .header h2 { font-size: 16px; font-weight: 600; }
+        
+        .chat-container { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; }
+        .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: var(--text-secondary); gap: 12px; padding: 40px; }
+        .empty-state h3 { font-size: 22px; color: var(--text-primary); font-weight: 600; }
+        .empty-state p { font-size: 14px; max-width: 400px; }
+        
+        .message { max-width: 80%; padding: 12px 16px; border-radius: var(--radius); line-height: 1.6; font-size: 14px; position: relative; animation: fadeIn 0.3s ease; }
+        .message.user { align-self: flex-end; background: var(--accent); color: white; border-bottom-right-radius: 4px; }
+        .message.ai { align-self: flex-start; background: white; border: 1px solid var(--border); color: var(--text-primary); border-bottom-left-radius: 4px; }
+        .message.error { background: #fef2f2; color: var(--error); border-color: #fecaca; }
+        .typing-cursor::after { content: '▋'; animation: blink 1s infinite; }
+
+        .input-area { padding: 16px 24px 20px; background: var(--bg-sidebar); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+        .tabs { display: flex; gap: 16px; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
+        .tabs span { cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: 0.2s; }
+        .tabs span.active { background: #eff6ff; color: var(--accent); font-weight: 500; }
+        .input-wrapper { display: flex; gap: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; align-items: flex-end; box-shadow: var(--shadow); }
+        #userInput { flex: 1; border: none; background: transparent; resize: none; padding: 8px; max-height: 120px; outline: none; line-height: 1.5; }
+        #sendBtn { padding: 8px 16px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; transition: 0.2s; height: 36px; }
+        #sendBtn:hover:not(:disabled) { background: var(--accent-hover); }
+        #sendBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .disclaimer { font-size: 11px; color: var(--text-secondary); text-align: center; margin-top: 2px; }
+
+        /* Modals */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(2px); display: none; align-items: center; justify-content: center; z-index: 100; opacity: 0; transition: opacity 0.2s; }
+        .modal-overlay.show { display: flex; opacity: 1; }
+        .modal { background: white; border-radius: 16px; width: 90%; max-width: 480px; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); padding: 24px; transform: scale(0.95); transition: transform 0.2s; }
+        .modal.show { transform: scale(1); }
+        .modal h3 { font-size: 18px; margin-bottom: 16px; font-weight: 600; }
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; font-weight: 500; }
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; outline: none; transition: border 0.2s; }
+        .form-group input:focus, .form-group select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1); }
+        .form-hint { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+        .form-row { display: flex; gap: 12px; align-items: flex-end; }
+        .form-row .form-group { flex: 1; margin-bottom: 0; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+        .btn { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: white; cursor: pointer; font-weight: 500; transition: 0.2s; }
+        .btn:hover { background: #f8fafc; }
+        .btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+        .btn.primary:hover { background: var(--accent-hover); }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; margin-left: 6px; }
+        .badge.detected { background: #dcfce7; color: #166534; }
+        .badge.default { background: #f1f5f9; color: #475569; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar { position: fixed; left: -260px; height: 100%; z-index: 90; }
+            .sidebar.open { left: 0; transform: translateX(0); }
+            .menu-toggle { display: block; position: absolute; top: 16px; left: 16px; z-index: 80; background: white; border: 1px solid var(--border); padding: 6px; border-radius: 6px; }
+            .main { padding-top: 40px; }
+        }
+        @media (min-width: 769px) { .menu-toggle { display: none; } }
+    </style>
+</head>
+<body>
+
+<button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+<aside class="sidebar" id="sidebar">
+    <div class="logo">🤖 AI <span>Hub</span></div>
+    <button class="nav-btn primary" onclick="startNewChat()">➕ 新建对话</button>
+    <button class="nav-btn" onclick="openModal('settings')">⚙️ 设置</button>
+    <button class="nav-btn" onclick="openModal('addModel')">📦 添加模型</button>
+    <div class="model-list" id="modelList"></div>
+</aside>
+
+<main class="main">
+    <header class="header">
+        <h2 id="chatTitle">新对话</h2>
+        <div style="display:flex; gap:8px; align-items:center; font-size:13px; color:var(--text-secondary);">
+            <span id="statusIndicator">未连接模型</span>
+        </div>
+    </header>
+
+    <div class="chat-container" id="chatContainer">
+        <div class="empty-state">
+            <h3>你好，有什么可以帮你？</h3>
+            <p>添加你的AI模型，开始智能对话</p>
+        </div>
+        <div id="messages"></div>
+    </div>
+
+    <div class="input-area">
+        <div class="tabs">
+            <span class="active">对话</span><span>绘图</span><span>视频</span><span>编程</span>
+        </div>
+        <div class="input-wrapper">
+            <textarea id="userInput" rows="1" placeholder="输入你的问题... (Shift+Enter 换行)"></textarea>
+            <button id="sendBtn" onclick="handleSend()">发送</button>
+        </div>
+        <div class="disclaimer">⚠️ AI 可能会犯错，请核实重要信息</div>
+    </div>
+</main>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+    <div class="modal">
+        <h3>设置</h3>
+        <p class="form-hint" style="margin-bottom:12px;">配置你的API密钥，所有数据仅保存在本地浏览器中。</p>
+        <div class="form-group">
+            <label>OpenAI API Key</label>
+            <input type="password" id="openaiKey" placeholder="sk-...">
+        </div>
+        <div class="form-group">
+            <label>Claude API Key</label>
+            <input type="password" id="claudeKey" placeholder="sk-ant-...">
+        </div>
+        <div class="form-group">
+            <label>Gemini API Key</label>
+            <input type="password" id="geminiKey" placeholder="AIza...">
+        </div>
+        <div class="form-group">
+            <label>本地模型地址 (Ollama等)</label>
+            <input type="text" id="localUrl" placeholder="http://localhost:11434/v1">
+        </div>
+        <div class="modal-actions">
+            <button class="btn" onclick="closeModal('settings')">取消</button>
+            <button class="btn primary" onclick="saveSettings()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Model Modal -->
+<div class="modal-overlay" id="addModelModal">
+    <div class="modal">
+        <h3>添加模型</h3>
+        <div class="form-group">
+            <label>模型名称</label>
+            <input type="text" id="newModelName" placeholder="例如: qwen-plus, qwen-turbo" oninput="detectProvider()">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>API Key ID</label>
+                <input type="text" id="apiKeyId" placeholder="可选">
+            </div>
+            <div class="form-group">
+                <label>签名密钥 Secret</label>
+                <input type="password" id="apiKeySecret" placeholder="可选">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>完整API Key <span id="keyFormatHint" class="form-hint">格式: {API Key ID}.{secret} 或直接粘贴完整密钥</span></label>
+            <input type="password" id="fullApiKey" placeholder="sk-xxxxxxxxxxxx">
+        </div>
+        <div class="form-group">
+            <label>Base URL</label>
+            <input type="text" id="baseUrl" placeholder="留空则使用默认地址" oninput="detectProvider()">
+            <div class="form-hint">系统会自动识别API类型 <span id="providerBadge" class="badge default">未识别</span></div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn" id="testConnBtn" onclick="testConnection()">🔗 测试连接</button>
+            <div style="flex:1"></div>
+            <button class="btn" onclick="closeModal('addModel')">取消</button>
+            <button class="btn primary" onclick="addModel()">添加</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // State Management
+    const state = {
+        models: JSON.parse(localStorage.getItem('ai_hub_models') || '[]'),
+        currentModelId: localStorage.getItem('ai_hub_current_model') || null,
+        settings: JSON.parse(localStorage.getItem('ai_hub_settings') || '{}'),
+        chatHistory: [],
+        isStreaming: false,
+        abortController: null
+    };
+
+    // Init
+    document.addEventListener('DOMContentLoaded', () => {
+        loadSettingsToUI();
+        renderModelList();
+        setupInputEvents();
+        if (state.models.length > 0 && !state.currentModelId) {
+            selectModel(state.models[0].id);
+        } else if (state.currentModelId) {
+            selectModel(state.currentModelId);
+        }
+        detectProvider(); // Initial detection
+    });
+
+    // UI Helpers
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+    }
+
+    function openModal(type) {
+        document.getElementById(`${type}Modal`).classList.add('show');
+        if(type === 'addModel') resetAddForm();
+    }
+
+    function closeModal(type) {
+        document.getElementById(`${type}Modal`).classList.remove('show');
+    }
+
+    function resetAddForm() {
+        document.getElementById('newModelName').value = '';
+        document.getElementById('apiKeyId').value = '';
+        document.getElementById('apiKeySecret').value = '';
+        document.getElementById('fullApiKey').value = '';
+        document.getElementById('baseUrl').value = '';
+        detectProvider();
+    }
+
+    function loadSettingsToUI() {
+        document.getElementById('openaiKey').value = state.settings.openaiKey || '';
+        document.getElementById('claudeKey').value = state.settings.claudeKey || '';
+        document.getElementById('geminiKey').value = state.settings.geminiKey || '';
+        document.getElementById('localUrl').value = state.settings.localUrl || '';
+    }
+
+    // Model & Provider Logic
+    function detectProvider() {
+        const url = document.getElementById('baseUrl').value.trim();
+        const name = document.getElementById('newModelName').value.trim().toLowerCase();
+        const badge = document.getElementById('providerBadge');
+        
+        let provider = '未知';
+        let isDefault = false;
+
+        if (!url && (name.includes('qwen') || name.includes('dashscope'))) {
+            provider = '阿里百炼 (Qwen)';
+            isDefault = true;
+        } else if (url.includes('dashscope') || url.includes('aliyun')) {
+            provider = '阿里百炼 (DashScope)';
+        } else if (url.includes('openai') || !url) {
+            provider = 'OpenAI Compatible';
+            if(!url) isDefault = true;
+        } else if (url.includes('anthropic') || url.includes('claude')) {
+            provider = 'Anthropic';
+        } else if (url.includes('gemini')) {
+            provider = 'Google Gemini';
+        } else if (url.includes('localhost') || url.includes('11434')) {
+            provider = '本地模型 (Ollama)';
+        } else {
+            provider = '自定义';
+        }
+
+        badge.textContent = isDefault ? `${provider} (默认)` : provider;
+        badge.className = `badge ${isDefault ? 'default' : 'detected'}`;
+        
+        // Auto-fill default URL if empty
+        if (!url && (name.includes('qwen') || name.includes('dashscope'))) {
+            document.getElementById('baseUrl').placeholder = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+        } else if (!url) {
+            document.getElementById('baseUrl').placeholder = 'https://api.openai.com/v1';
+        }
+    }
+
+    function renderModelList() {
+        const list = document.getElementById('modelList');
+        list.innerHTML = '';
+        if (state.models.length === 0) {
+            list.innerHTML = '<div style="padding:12px; text-align:center; color:var(--text-secondary); font-size:13px;">暂无模型，请点击"添加模型"</div>';
+            return;
+        }
+        state.models.forEach(m => {
+            const div = document.createElement('div');
+            div.className = `model-item ${m.id === state.currentModelId ? 'selected' : ''}`;
+            div.innerHTML = `<span>${m.name}</span><span class="model-tag">${m.provider || 'Custom'}</span>`;
+            div.onclick = () => selectModel(m.id);
+            list.appendChild(div);
+        });
+    }
+
+    function selectModel(id) {
+        state.currentModelId = id;
+        localStorage.setItem('ai_hub_current_model', id);
+        renderModelList();
+        const model = state.models.find(m => m.id === id);
+        document.getElementById('chatTitle').textContent = `新对话 (${model ? model.name : ''})`;
+        document.getElementById('statusIndicator').textContent = model ? `已就绪: ${model.name}` : '未连接模型';
+        document.getElementById('statusIndicator').style.color = model ? 'var(--success)' : 'var(--warning)';
+    }
+
+    function saveSettings() {
+        state.settings = {
+            openaiKey: document.getElementById('openaiKey').value.trim(),
+            claudeKey: document.getElementById('claudeKey').value.trim(),
+            geminiKey: document.getElementById('geminiKey').value.trim(),
+            localUrl: document.getElementById('localUrl').value.trim()
+        };
+        localStorage.setItem('ai_hub_settings', JSON.stringify(state.settings));
+        closeModal('settings');
+    }
+
+    function addModel() {
+        const name = document.getElementById('newModelName').value.trim();
+        const fullKey = document.getElementById('fullApiKey').value.trim();
+        let baseUrl = document.getElementById('baseUrl').value.trim();
+
+        if (!name) return alert('请输入模型名称');
+        if (!fullKey && !state.settings.openaiKey) return alert('请输入完整API Key');
+
+        // Auto default URL
+        if (!baseUrl) {
+            if (name.toLowerCase().includes('qwen') || name.toLowerCase().includes('dashscope')) {
+                baseUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+            } else {
+                baseUrl = 'https://api.openai.com/v1';
+            }
+        }
+
+        const newModel = {
+            id: Date.now().toString(),
+            name,
+            apiKey: fullKey || state.settings.openaiKey,
+            baseUrl: baseUrl,
+            provider: document.getElementById('providerBadge').textContent.split(' ')[0]
+        };
+
+        state.models.push(newModel);
+        localStorage.setItem('ai_hub_models', JSON.stringify(state.models));
+        renderModelList();
+        selectModel(newModel.id);
+        closeModal('addModel');
+    }
+
+    // Chat Logic
+    function startNewChat() {
+        state.chatHistory = [];
+        document.getElementById('messages').innerHTML = '';
+        document.getElementById('chatContainer').querySelector('.empty-state').style.display = 'flex';
+        document.getElementById('chatTitle').textContent = '新对话';
+    }
+
+    function setupInputEvents() {
+        const input = document.getElementById('userInput');
+        input.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+            }
+        });
+    }
+
+    async function handleSend() {
+        const input = document.getElementById('userInput');
+        const btn = document.getElementById('sendBtn');
+        const text = input.value.trim();
+
+        if (!text || state.isStreaming) return;
+        if (!state.currentModelId) return alert('请先添加并选择一个模型');
+
+        const model = state.models.find(m => m.id === state.currentModelId);
+        if (!model) return alert('模型配置丢失，请重新添加');
+
+        state.isStreaming = true;
+        btn.disabled = true;
+        input.value = '';
+        input.style.height = 'auto';
+        document.getElementById('chatContainer').querySelector('.empty-state').style.display = 'none';
+
+        // Add user message
+        appendMessage('user', text);
+        state.chatHistory.push({ role: 'user', content: text });
+
+        // Add AI loading message
+        const aiMsgDiv = appendMessage('ai', '', true);
+        const contentDiv = aiMsgDiv.querySelector('.msg-content');
+
+        try {
+            const baseUrl = model.baseUrl.endsWith('/') ? model.baseUrl.slice(0, -1) : model.baseUrl;
+            const apiUrl = `${baseUrl}/chat/completions`;
+
+            state.abortController = new AbortController();
+            
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${model.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: model.name,
+                    messages: state.chatHistory,
+                    stream: true
+                }),
+                signal: state.abortController.signal
+            });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`API错误 ${response.status}: ${errText}`);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let fullResponse = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
+                
+                for (const line of lines) {
+                    const jsonStr = line.slice(6);
+                    if (jsonStr.trim() === '[DONE]') continue;
+                    try {
+                        const parsed = JSON.parse(jsonStr);
+                        const delta = parsed.choices?.[0]?.delta?.content;
+                        if (delta) {
+                            fullResponse += delta;
+                            contentDiv.textContent = fullResponse;
+                            scrollToBottom();
+                        }
+                    } catch (e) { /* skip malformed JSON lines */ }
+                }
+            }
+
+            contentDiv.classList.remove('typing-cursor');
+            state.chatHistory.push({ role: 'assistant', content: fullResponse });
+
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                contentDiv.textContent += ' [已停止]';
+            } else {
+                aiMsgDiv.classList.add('error');
+                contentDiv.textContent = `❌ ${err.message || '请求失败，请检查网络或API配置'}`;
+            }
+            contentDiv.classList.remove('typing-cursor');
+        } finally {
+            state.isStreaming = false;
+            btn.disabled = false;
+            btn.textContent = '发送';
+        }
+    }
+
+    function appendMessage(role, content, isLoading = false) {
+        const container = document.getElementById('messages');
+        const div = document.createElement('div');
+        div.className = `message ${role} ${isLoading ? 'typing-cursor' : ''}`;
+        div.innerHTML = `<div class="msg-content">${content}</div>`;
+        container.appendChild(div);
+        scrollToBottom();
+        return div;
+    }
+
+    function scrollToBottom() {
+        const chat = document.getElementById('chatContainer');
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    async function testConnection() {
+        const btn = document.getElementById('testConnBtn');
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '⏳ 测试中...';
+
+        const name = document.getElementById('newModelName').value.trim() || 'test';
+        const fullKey = document.getElementById('fullApiKey').value.trim() || state.settings.openaiKey;
+        let baseUrl = document.getElementById('baseUrl').value.trim();
+        
+        if (!baseUrl) {
+            baseUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+        }
+
+        try {
+            const res = await fetch(`${baseUrl.endsWith('/') ? baseUrl.slice(0,-1) : baseUrl}/chat/completions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${fullKey}` },
+                body: JSON.stringify({ model: name, messages: [{role:'user', content:'ping'}], max_tokens: 5 })
+            });
+            if (res.ok) {
+                alert('✅ 连接成功！API Key 和 Base URL 配置正确。');
+            } else {
+                const err = await res.text();
+                alert(`⚠️ 连接失败 (${res.status})\n${err}`);
+            }
+        } catch (e) {
+            alert(`❌ 网络请求失败: ${e.message}`);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    }
+
+    // Close modal on overlay click
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', e => {
+            if (e.target === overlay) overlay.classList.remove('show');
+        });
+    });
+</script>
+</body>
+</html>
+
